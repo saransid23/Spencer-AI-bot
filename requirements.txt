@@ -1,0 +1,20 @@
+# Core framework
+fastapi
+uvicorn[standard]
+python-multipart
+
+# AI & LangChain
+langchain
+langchain-openai
+openai
+
+# Database
+motor
+pymongo
+
+# Config & Utilities
+pydantic
+pydantic-settings
+python-dotenv
+httpx
+

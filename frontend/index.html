@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spencer | Advanced AI Assistant</title>
+    <meta name="description" content="Spencer - Advanced Voice Assistant & Intelligent Problem Solver. Ask anything, get expert answers with code, analysis, and reasoning.">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- highlight.js — Code Syntax Highlighting -->
+    <link rel="stylesheet" id="hljs-dark-theme" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <link rel="stylesheet" id="hljs-light-theme" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" disabled>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- marked.js — Markdown Parser -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <!-- DOMPurify — XSS-safe HTML sanitizer -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.5/purify.min.js"></script>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="dark-theme">
+    <!-- Intro Overlay -->
+    <div class="intro-overlay" id="introOverlay">
+        <h2 class="text-logo large intro-text">
+            <span style="--delay: 0s">S</span><span style="--delay: 0.1s">P</span><span style="--delay: 0.2s">E</span><span style="--delay: 0.3s">N</span><span style="--delay: 0.4s">C</span><span style="--delay: 0.5s">E</span><span style="--delay: 0.6s">R</span>
+        </h2>
+    </div>
+
+    <div class="app-container">
+
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <h2 class="text-logo">SPENCER</h2>
+                </div>
+            </div>
+
+            <div class="sidebar-nav">
+                <button class="new-chat-btn" id="newChatBtn">
+                    <i class="fa-solid fa-pen-to-square"></i> New Chat
+                </button>
+
+                <div class="nav-section">
+                    <button class="nav-item" id="exploreBtn"><i class="fa-solid fa-globe"></i> Explore Spencer</button>
+                    <button class="nav-item" id="myStuffBtn"><i class="fa-regular fa-folder"></i> My Stuff</button>
+                </div>
+
+                <div class="chats-section">
+                    <div class="section-title">
+                        <h3>Recent Chats</h3>
+                        <button class="icon-btn-small" id="refreshSessionsBtn" title="Refresh history">
+                            <i class="fa-solid fa-rotate-right"></i>
+                        </button>
+                    </div>
+                    <div class="chat-list" id="chatList">
+                        <div class="sessions-loading">
+                            <i class="fa-solid fa-circle-notch fa-spin"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <button class="nav-item" id="settingsBtn">
+                    <i class="fa-solid fa-gear"></i> Settings
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Area -->
+        <main class="main-content">
+            <!-- Top Controls -->
+            <header class="main-header">
+                <button id="sidebarToggle" class="icon-btn" title="Toggle Sidebar">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <div class="header-controls">
+                    <button id="ttsToggle" class="icon-btn tts-btn" title="Toggle Text-to-Speech">
+                        <i class="fa-solid fa-volume-high"></i>
+                    </button>
+                    <button id="themeToggle" class="icon-btn theme-btn" title="Toggle Theme">
+                        <i class="fa-solid fa-sun light-icon"></i>
+                        <i class="fa-solid fa-moon dark-icon"></i>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Chat / Empty State Area -->
+            <div class="chat-area" id="chatArea">
+                <!-- Empty State (Shown initially) -->
+                <div class="greeting-container" id="greetingContainer">
+                    <div class="greeting-logo-container">
+                        <div class="text-logo large hero-logo" id="heroLogo">
+                            <span style="--delay: 0s">S</span>
+                            <span style="--delay: 0.1s">P</span>
+                            <span style="--delay: 0.2s">E</span>
+                            <span style="--delay: 0.3s">N</span>
+                            <span style="--delay: 0.4s">C</span>
+                            <span style="--delay: 0.5s">E</span>
+                            <span style="--delay: 0.6s">R</span>
+                        </div>
+                    </div>
+                    <p class="greeting-subtitle">Your intelligent companion for code, research, and problem solving.</p>
+
+                    <!-- Suggestion chips -->
+                    <div class="suggestion-chips">
+                        <button class="chip" data-prompt="Explain how async/await works in Python with examples">
+                            <i class="fa-brands fa-python"></i> Async/Await in Python
+                        </button>
+                        <button class="chip" data-prompt="What is the difference between SQL and NoSQL databases?">
+                            <i class="fa-solid fa-database"></i> SQL vs NoSQL
+                        </button>
+                        <button class="chip" data-prompt="Write a binary search algorithm in Python with explanation">
+                            <i class="fa-solid fa-code"></i> Binary Search
+                        </button>
+                        <button class="chip" data-prompt="How do I design a scalable REST API?">
+                            <i class="fa-solid fa-server"></i> REST API Design
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Chat History (Hidden initially, populated dynamically) -->
+                <div class="chat-history" id="chatHistory" style="display: none;"></div>
+            </div>
+
+            <!-- Bottom Input Panel -->
+            <div class="input-container">
+                <div class="input-panel" id="inputPanel">
+                    <textarea id="chatInput" placeholder="Ask me anything..." rows="1"></textarea>
+
+                    <div class="input-actions">
+                        <div class="action-buttons-left">
+                            <button class="action-btn" id="voiceBtn" title="Use Voice Input">
+                                <i class="fa-solid fa-microphone"></i> Voice
+                            </button>
+                        </div>
+                        <div class="action-buttons-right">
+                            <button class="send-btn" id="sendBtn" title="Send message">
+                                <i class="fa-solid fa-paper-plane"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <p class="disclaimer">Spencer can make mistakes. Consider verifying important information.</p>
+            </div>
+        </main>
+    </div>
+
+    <!-- Custom JS -->
+    <script src="app.js"></script>
+</body>
+</html>
