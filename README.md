@@ -31,7 +31,7 @@ Spencer is a Python-based AI voice assistant built to do more than answer questi
 
 <br>
 
-## 🧩 Architecture
+##  Architecture
 
 | Layer | Technology |
 |---|---|
