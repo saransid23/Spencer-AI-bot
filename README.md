@@ -71,8 +71,7 @@ flowchart TD
 
 ---
 
-## 4. PostgreSQL Installation & Configuration on Windows
-
+#
 If PostgreSQL is not yet installed on your Windows system, follow these steps:
 
 ### Step 4.1: Download and Install PostgreSQL
