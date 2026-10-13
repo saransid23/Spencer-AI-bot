@@ -181,7 +181,6 @@ OPENAI_API_KEY=
 
 ---
 
-## 7. Database Migrations (Alembic)
 
 Initialize and apply the database schema using Alembic:
 
