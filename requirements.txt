@@ -1,20 +1,29 @@
 # Core framework
-fastapi
-uvicorn[standard]
-python-multipart
+fastapi>=0.110.0
+uvicorn[standard]>=0.28.0
+python-multipart>=0.0.9
 
-# AI & LangChain
-langchain
-langchain-openai
-openai
+# AI & LLM (Ollama Local Inference)
+langchain>=0.2.0
+langchain-core>=0.2.0
+langchain-ollama>=0.1.0
+ollama>=0.2.0
 
-# Database
-motor
-pymongo
+# Optional Voice Transcription (OpenAI Whisper)
+openai>=1.30.0
 
-# Config & Utilities
-pydantic
-pydantic-settings
-python-dotenv
-httpx
+# Database & Migrations (PostgreSQL)
+sqlalchemy[asyncio]>=2.0.0
+asyncpg>=0.29.0
+greenlet>=3.0.0
+alembic>=1.13.0
 
+# Optional MongoDB for data migration script
+motor>=3.4.0
+pymongo>=4.6.0
+
+# Configuration & Utilities
+pydantic>=2.7.0
+pydantic-settings>=2.2.0
+python-dotenv>=1.0.0
+httpx>=0.27.0

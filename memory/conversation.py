@@ -1,112 +1,145 @@
-from backend.database.connection import db
+import logging
+from typing import List, Dict, Optional, Any, Union
 from datetime import datetime
-from typing import List, Dict, Optional
+
+from backend.database.connection import db_manager
+from backend.database.repository import ConversationRepository, parse_or_generate_uuid
+
+logger = logging.getLogger(__name__)
 
 class MemoryManager:
+    """
+    PostgreSQL-backed conversation memory manager.
+    Maintains clean session boundaries, isolated context, and message ordering.
+    """
     def __init__(self):
-        pass
+        # In-memory transient fallback if database is completely offline
+        self._fallback_memory: Dict[str, List[Dict[str, Any]]] = {}
 
-    @property
-    def collection(self):
-        return db.db["conversations"] if db.db is not None else None
-
-    async def add_message(self, session_id: str, role: str, content: str):
+    async def add_message(
+        self,
+        session_id: Union[str, Any],
+        role: str,
+        content: str,
+        metadata: Optional[Dict[str, Any]] = None
+    ):
         """
         Adds a message to the conversation history for a given session.
-        Role can be 'user' or 'assistant'.
+        Persists to PostgreSQL with UTC timestamps.
         """
-        if self.collection is None:
-            print("Database not connected. Cannot save memory.")
-            return
+        str_id = str(session_id)
+        if db_manager.session_factory:
+            try:
+                async with db_manager.session_factory() as session:
+                    await ConversationRepository.add_message(
+                        session=session,
+                        conversation_id=str_id,
+                        role=role,
+                        content=content,
+                        metadata=metadata
+                    )
+                    return
+            except Exception as e:
+                logger.error(f"Failed to persist message to PostgreSQL ({e}). Using in-memory fallback.")
 
-        message = {
-            "session_id": session_id,
+        # Fallback to local memory if DB is down
+        if str_id not in self._fallback_memory:
+            self._fallback_memory[str_id] = []
+        self._fallback_memory[str_id].append({
             "role": role,
             "content": content,
-            "timestamp": datetime.utcnow()
-        }
-        await self.collection.insert_one(message)
+            "timestamp": datetime.utcnow().isoformat()
+        })
 
-    async def get_history(self, session_id: str, limit: int = 10) -> List[Dict]:
+    async def get_history(self, session_id: Union[str, Any], limit: int = 10) -> List[Dict[str, Any]]:
         """
         Retrieves the last N messages for the session in chronological order.
         """
-        if self.collection is None:
-            return []
-
-        cursor = self.collection.find(
-            {"session_id": session_id},
-            {"_id": 0, "role": 1, "content": 1, "timestamp": 1}
-        ).sort("timestamp", -1).limit(limit)
-        messages = await cursor.to_list(length=limit)
-
-        # Reverse to get chronological order
-        return messages[::-1]
-
-    async def get_sessions(self, limit: int = 50) -> List[Dict]:
-        """
-        Returns a list of unique sessions, each with an id, title (first user message),
-        and the timestamp of the last message — sorted most-recent first.
-        """
-        if self.collection is None:
-            return []
-
-        pipeline = [
-            {"$sort": {"timestamp": 1}},
-            {
-                "$group": {
-                    "_id": "$session_id",
-                    "first_user_message": {
-                        "$first": {
-                            "$cond": [{"$eq": ["$role", "user"]}, "$content", None]
+        str_id = str(session_id)
+        if db_manager.session_factory:
+            try:
+                async with db_manager.session_factory() as session:
+                    messages = await ConversationRepository.get_messages(
+                        session=session,
+                        conversation_id=str_id,
+                        limit=limit
+                    )
+                    return [
+                        {
+                            "id": str(msg.id),
+                            "role": msg.role,
+                            "content": msg.content,
+                            "timestamp": msg.created_at.isoformat() if msg.created_at else None
                         }
-                    },
-                    "last_timestamp": {"$last": "$timestamp"},
-                    "message_count": {"$sum": 1}
-                }
-            },
-            {"$sort": {"last_timestamp": -1}},
-            {"$limit": limit}
-        ]
+                        for msg in messages
+                    ]
+            except Exception as e:
+                logger.error(f"Failed to fetch history from PostgreSQL ({e}). Using in-memory fallback.")
 
-        cursor = self.collection.aggregate(pipeline)
-        sessions = await cursor.to_list(length=limit)
+        fallback = self._fallback_memory.get(str_id, [])
+        return fallback[-limit:]
 
-        result = []
-        for s in sessions:
-            title = s.get("first_user_message") or "New Conversation"
-            # Truncate long titles
-            if len(title) > 50:
-                title = title[:47] + "..."
-            result.append({
-                "session_id": s["_id"],
+    async def get_sessions(self, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
+        """
+        Returns a list of sessions sorted most-recent first for the sidebar.
+        """
+        if db_manager.session_factory:
+            try:
+                async with db_manager.session_factory() as session:
+                    return await ConversationRepository.get_session_summaries(
+                        session=session,
+                        limit=limit,
+                        offset=offset
+                    )
+            except Exception as e:
+                logger.error(f"Failed to list sessions from PostgreSQL ({e}). Using in-memory fallback.")
+
+        summaries = []
+        for sid, msgs in self._fallback_memory.items():
+            first_user = next((m["content"] for m in msgs if m["role"] == "user"), "New Conversation")
+            title = first_user[:47] + "..." if len(first_user) > 50 else first_user
+            last_ts = msgs[-1]["timestamp"] if msgs else None
+            summaries.append({
+                "session_id": sid,
                 "title": title,
-                "last_timestamp": s["last_timestamp"].isoformat() if s.get("last_timestamp") else None,
-                "message_count": s.get("message_count", 0)
+                "last_timestamp": last_ts,
+                "message_count": len(msgs)
             })
+        return summaries
 
-        return result
-
-    async def delete_session(self, session_id: str) -> int:
+    async def delete_session(self, session_id: Union[str, Any]) -> int:
         """
-        Deletes all messages for a given session. Returns count of deleted documents.
+        Deletes all messages and the conversation for a given session.
         """
-        if self.collection is None:
-            return 0
+        str_id = str(session_id)
+        count = 0
+        if db_manager.session_factory:
+            try:
+                async with db_manager.session_factory() as session:
+                    count = await ConversationRepository.delete_conversation(session, str_id)
+            except Exception as e:
+                logger.error(f"Failed to delete session in PostgreSQL ({e}).")
 
-        result = await self.collection.delete_many({"session_id": session_id})
-        return result.deleted_count
+        if str_id in self._fallback_memory:
+            del self._fallback_memory[str_id]
+            count = max(count, 1)
 
-    async def get_session_title(self, session_id: str) -> Optional[str]:
+        return count
+
+    async def get_session_title(self, session_id: Union[str, Any]) -> Optional[str]:
         """
-        Returns the first user message for a session (used as the sidebar title).
+        Returns the title of a conversation session.
         """
-        if self.collection is None:
-            return None
+        str_id = str(session_id)
+        if db_manager.session_factory:
+            try:
+                async with db_manager.session_factory() as session:
+                    conv = await ConversationRepository.get_conversation(session, str_id)
+                    if conv:
+                        return conv.title
+            except Exception as e:
+                logger.error(f"Failed to get session title from PostgreSQL ({e}).")
 
-        doc = await self.collection.find_one(
-            {"session_id": session_id, "role": "user"},
-            {"content": 1},
-            sort=[("timestamp", 1)]
-        )
-        return doc["content"][:50] if doc else None
+        msgs = self._fallback_memory.get(str_id, [])
+        first_user = next((m["content"] for m in msgs if m["role"] == "user"), None)
+        return first_user[:50] if first_user else None

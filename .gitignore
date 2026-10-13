@@ -13,6 +13,11 @@ __pycache__/
 *$py.class
 .pytest_cache/
 
+# Local databases & testing artifacts
+*.db
+*.sqlite
+*.sqlite3
+
 # IDE & Editor files
 .vscode/
 .idea/
